@@ -1,0 +1,6 @@
+# 垃圾分类助手 - Python 依赖
+# Web 版为纯前端 HTML，无需安装依赖
+# Python CLI 版仅使用标准库，无需额外安装
+
+# 如需本地启动 HTTP 服务器预览 Web 应用，可安装:
+# pip install flask

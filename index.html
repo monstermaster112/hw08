@@ -1,0 +1,920 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>垃圾分类助手</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --recyclable: #2196F3;
+    --recyclable-bg: #E3F2FD;
+    --hazardous: #F44336;
+    --hazardous-bg: #FFEBEE;
+    --kitchen: #4CAF50;
+    --kitchen-bg: #E8F5E9;
+    --other: #78909C;
+    --other-bg: #ECEFF1;
+    --radius: 12px;
+    --shadow: 0 2px 12px rgba(0,0,0,0.08);
+  }
+  html { font-size: 16px; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    background: #f5f7fa;
+    color: #2c3e50;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .header {
+    background: linear-gradient(135deg, #1a237e, #283593);
+    color: #fff;
+    padding: 32px 20px 28px;
+    text-align: center;
+  }
+  .header h1 { font-size: 1.6rem; font-weight: 700; letter-spacing: 1px; }
+  .header p { font-size: 0.88rem; opacity: 0.8; margin-top: 6px; }
+
+  .search-wrap {
+    max-width: 520px;
+    margin: -24px auto 0;
+    padding: 0 16px;
+    position: relative;
+    z-index: 10;
+  }
+  .search-box {
+    display: flex;
+    background: #fff;
+    border-radius: var(--radius);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+    overflow: hidden;
+  }
+  .search-box input {
+    flex: 1;
+    border: none;
+    outline: none;
+    padding: 14px 16px;
+    font-size: 0.95rem;
+    background: transparent;
+    color: #333;
+  }
+  .search-box input::placeholder { color: #aaa; }
+  .search-box button {
+    background: #3949AB;
+    border: none;
+    color: #fff;
+    padding: 0 20px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    transition: background 0.2s;
+  }
+  .search-box button:hover { background: #1a237e; }
+
+  .suggestions {
+    background: #fff;
+    border-radius: 0 0 var(--radius) var(--radius);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+    max-height: 260px;
+    overflow-y: auto;
+    display: none;
+  }
+  .suggestions.show { display: block; }
+  .suggestions .item {
+    padding: 10px 16px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.9rem;
+    transition: background 0.15s;
+  }
+  .suggestions .item:hover { background: #f5f5f5; }
+  .suggestions .item .tag {
+    font-size: 0.72rem;
+    padding: 2px 8px;
+    border-radius: 20px;
+    color: #fff;
+    white-space: nowrap;
+  }
+
+  .result-wrap {
+    max-width: 600px;
+    margin: 16px auto 0;
+    padding: 0 16px;
+    display: none;
+  }
+  .result-wrap.show { display: block; }
+  .result-card {
+    background: #fff;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 24px;
+    text-align: center;
+  }
+  .result-card .icon { font-size: 3rem; margin-bottom: 8px; }
+  .result-card .name { font-size: 1.3rem; font-weight: 700; }
+  .result-card .cat-label {
+    display: inline-block;
+    margin-top: 10px;
+    padding: 6px 20px;
+    border-radius: 20px;
+    color: #fff;
+    font-size: 0.95rem;
+    font-weight: 600;
+  }
+  .result-card .desc { font-size: 0.85rem; color: #666; margin-top: 12px; line-height: 1.5; }
+  .result-card .close-btn {
+    margin-top: 16px;
+    padding: 6px 24px;
+    border: 1px solid #ddd;
+    border-radius: 20px;
+    background: #fff;
+    cursor: pointer;
+    font-size: 0.85rem;
+    color: #666;
+    transition: all 0.2s;
+  }
+  .result-card .close-btn:hover { background: #f5f5f5; border-color: #bbb; }
+
+  .cats {
+    max-width: 640px;
+    margin: 20px auto 0;
+    padding: 0 16px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+  }
+  .cat-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 12px 4px;
+    border-radius: var(--radius);
+    border: 2px solid transparent;
+    background: #fff;
+    box-shadow: var(--shadow);
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 0.78rem;
+    color: #555;
+    line-height: 1.3;
+  }
+  .cat-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 16px rgba(0,0,0,0.12); }
+  .cat-btn.active { border-width: 2px; border-style: solid; background: transparent; box-shadow: none; }
+  .cat-btn .dot { width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0; }
+
+  .items-wrap {
+    max-width: 680px;
+    margin: 16px auto 40px;
+    padding: 0 16px;
+    flex: 1;
+  }
+  .items-wrap .empty-state {
+    text-align: center;
+    padding: 40px 16px;
+    color: #999;
+  }
+  .items-wrap .empty-state .big-icon { font-size: 3rem; margin-bottom: 10px; }
+  .items-wrap .empty-state p { font-size: 0.9rem; }
+  .items-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+  .items-header h2 { font-size: 1.05rem; font-weight: 600; color: #444; }
+  .items-header .count { font-size: 0.8rem; color: #999; }
+  .items-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 8px;
+  }
+  .item-card {
+    background: #fff;
+    border-radius: 10px;
+    padding: 12px 10px;
+    text-align: center;
+    cursor: pointer;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    transition: all 0.15s;
+    font-size: 0.88rem;
+    color: #444;
+  }
+  .item-card:hover { transform: translateY(-2px); box-shadow: 0 3px 10px rgba(0,0,0,0.1); }
+  .item-card .line { width: 24px; height: 3px; border-radius: 2px; margin: 6px auto 0; }
+
+  .footer {
+    text-align: center;
+    padding: 16px;
+    font-size: 0.78rem;
+    color: #aaa;
+    border-top: 1px solid #eee;
+    margin-top: auto;
+  }
+
+  @media (max-width: 480px) {
+    .header { padding: 24px 16px 22px; }
+    .header h1 { font-size: 1.3rem; }
+    .cats { gap: 6px; }
+    .cat-btn { font-size: 0.7rem; padding: 10px 2px; }
+    .items-grid { grid-template-columns: repeat(3, 1fr); gap: 6px; }
+    .item-card { font-size: 0.82rem; padding: 10px 6px; }
+  }
+  @media (max-width: 360px) {
+    .items-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  
+  /* ---- Floating Mic Button ---- */
+  .voice-section {
+    max-width: 520px;
+    margin: 14px auto 0;
+    padding: 0 16px;
+    text-align: center;
+  }
+  .mic-btn-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+  .mic-btn {
+    width: 68px;
+    height: 68px;
+    border-radius: 50%;
+    border: none;
+    background: linear-gradient(135deg, #3949AB, #5C6BC0);
+    color: #fff;
+    font-size: 2rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 20px rgba(57, 73, 171, 0.35);
+    transition: all 0.3s ease;
+    position: relative;
+    outline: none;
+  }
+  .mic-btn::after {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    background: linear-gradient(135deg, #3949AB, #F44336, #3949AB) border-box;
+    -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .mic-btn:hover {
+    transform: scale(1.08);
+    box-shadow: 0 6px 28px rgba(57, 73, 171, 0.5);
+  }
+  .mic-btn:active {
+    transform: scale(0.95);
+  }
+  .mic-btn.listening {
+    background: linear-gradient(135deg, #E53935, #FF5252);
+    box-shadow: 0 4px 28px rgba(229, 57, 53, 0.5);
+    animation: mic-pulse 1.4s ease-in-out infinite;
+  }
+  .mic-btn.listening::after {
+    opacity: 1;
+    animation: mic-ring 1.4s ease-in-out infinite;
+  }
+  @keyframes mic-pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+  }
+  @keyframes mic-ring {
+    0%, 100% { opacity: 0.4; transform: scale(1); }
+    50% { opacity: 0.8; transform: scale(1.12); }
+  }
+  .mic-label {
+    font-size: 0.78rem;
+    color: #888;
+    transition: all 0.3s;
+  }
+  .mic-label.active {
+    color: #E53935;
+    font-weight: 600;
+  }
+
+  .voice-status {
+    text-align: center;
+    font-size: 0.78rem;
+    color: #E53935;
+    min-height: 24px;
+    line-height: 24px;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .voice-status.active {
+    opacity: 1;
+  }
+
+  .speaker-btn {
+    background: transparent;
+    border: 1px solid #ddd;
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    cursor: pointer;
+    font-size: 1rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: 10px;
+    transition: all 0.2s;
+    vertical-align: middle;
+  }
+  .speaker-btn:hover { background: #f0f0f0; border-color: #bbb; }
+::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<header class="header">
+  <h1>♻️ 垃圾分类助手</h1>
+  <p>🎤 支持语音识别 · 输入/说出物品名查询分类</p>
+</header>
+
+<div class="search-wrap">
+  <div class="search-box">
+    <input type="text" id="searchInput" placeholder="搜索物品名称，如「塑料瓶」「苹果核」…" autocomplete="off">
+    <button id="searchBtn">搜索</button>
+  </div>
+  <div class="suggestions" id="suggestions"></div>
+</div>
+
+<div class="voice-section">
+  <div class="mic-btn-wrap">
+    <button class="mic-btn" id="micBtn" title="点击说话查询分类">🎤</button>
+    <span class="mic-label" id="micLabel">点击说话</span>
+  </div>
+  <div class="voice-status" id="voiceStatus"></div>
+</div>
+
+<div class="result-wrap" id="resultWrap">
+  <div class="result-card">
+    <div class="icon" id="resultIcon"></div>
+    <div class="name" id="resultName"></div>
+    <div class="cat-label" id="resultLabel"></div>
+    <div class="desc" id="resultDesc"></div>
+    <button class="close-btn" id="closeResult">关闭</button>
+  </div>
+</div>
+
+<div class="cats" id="catFilters">
+  <button class="cat-btn" data-cat="all">
+    <span class="dot" style="background:#607D8B;"></span>
+    全部
+  </button>
+  <button class="cat-btn" data-cat="recyclable">
+    <span class="dot" style="background:var(--recyclable);"></span>
+    可回收物
+  </button>
+  <button class="cat-btn" data-cat="hazardous">
+    <span class="dot" style="background:var(--hazardous);"></span>
+    有害垃圾
+  </button>
+  <button class="cat-btn" data-cat="kitchen">
+    <span class="dot" style="background:var(--kitchen);"></span>
+    厨余垃圾
+  </button>
+  <button class="cat-btn" data-cat="other">
+    <span class="dot" style="background:var(--other);"></span>
+    其他垃圾
+  </button>
+</div>
+
+<div class="items-wrap" id="itemsWrap">
+  <div class="items-header">
+    <h2 id="listTitle">全部物品</h2>
+    <span class="count" id="listCount"></span>
+  </div>
+  <div class="items-grid" id="itemsGrid"></div>
+</div>
+
+<footer class="footer">
+  数据仅供参考 · 分类标准以当地政策为准
+</footer>
+
+<script>
+const CATEGORIES = {
+  recyclable: { name: '可回收物', color: '#2196F3', icon: '📦', desc: '适宜回收、可循环利用的生活废弃物。包括废纸、废塑料、废金属、废玻璃、废织物等。' },
+  hazardous:  { name: '有害垃圾', color: '#F44336', icon: '☣️', desc: '对人体健康或自然环境造成直接或潜在危害的废弃物。包括废电池、废灯管、废药品、废油漆等。' },
+  kitchen:    { name: '厨余垃圾', color: '#4CAF50', icon: '🍂', desc: '食材废料、剩菜剩饭、过期食品、瓜皮果核等易腐的生物质生活废弃物。' },
+  other:      { name: '其他垃圾', color: '#78909C', icon: '🗑️', desc: '除可回收物、有害垃圾、厨余垃圾以外的其他生活废弃物。' },
+};
+
+const ITEMS = [
+  // 可回收物
+  { name: '废纸', cat: 'recyclable', desc: '旧报纸、书本纸、包装纸盒、纸箱、打印纸、宣传单等未被污染的纸制品。' },
+  { name: '纸箱', cat: 'recyclable', desc: '快递纸箱、包装纸箱等，需清空内容物并压扁投放。' },
+  { name: '报纸', cat: 'recyclable', desc: '旧报纸、杂志、宣传单页等干净纸张。' },
+  { name: '杂志', cat: 'recyclable', desc: '旧杂志、画册、本子等纸质读物。' },
+  { name: '书本', cat: 'recyclable', desc: '旧课本、图书、笔记本等纸质物品。' },
+  { name: '纸盒', cat: 'recyclable', desc: '牛奶盒、饮料盒、快递盒等纸质包装盒，需清空并压扁。' },
+  { name: '塑料瓶', cat: 'recyclable', desc: '饮料瓶、矿泉水瓶、洗发水瓶等塑料容器，需清空冲洗后投放。' },
+  { name: '易拉罐', cat: 'recyclable', desc: '铝制饮料罐、啤酒罐等金属罐体。' },
+  { name: '玻璃瓶', cat: 'recyclable', desc: '酒瓶、酱料瓶、化妆品瓶等玻璃容器，需清空冲洗。' },
+  { name: '玻璃杯', cat: 'recyclable', desc: '废弃的玻璃水杯、酒杯等。' },
+  { name: '废金属', cat: 'recyclable', desc: '废弃的铁、铜、铝等金属制品，如易拉罐、金属瓶盖、罐头盒等。' },
+  { name: '废铁', cat: 'recyclable', desc: '废弃的铁制工具、铁罐、铁丝等。' },
+  { name: '废铜', cat: 'recyclable', desc: '废弃的铜线、铜管、铜制品等。' },
+  { name: '旧衣服', cat: 'recyclable', desc: '废弃的衣物、T恤、裤子、外套等纺织品。' },
+  { name: '旧鞋子', cat: 'recyclable', desc: '废弃的鞋子、拖鞋、运动鞋等。' },
+  { name: '旧包包', cat: 'recyclable', desc: '废弃的背包、手提包、帆布袋等。' },
+  { name: '废塑料', cat: 'recyclable', desc: '废弃塑料制品，如塑料瓶、塑料桶、塑料椅等。' },
+  { name: '塑料桶', cat: 'recyclable', desc: '废弃的塑料水桶、油桶等。' },
+  { name: '塑料凳', cat: 'recyclable', desc: '废弃的塑料凳子、塑料收纳盒等。' },
+  { name: '废纸板', cat: 'recyclable', desc: '纸板箱、瓦楞纸板等纸质包装材料。' },
+  { name: '书籍', cat: 'recyclable', desc: '旧书籍、教材、工具书等。' },
+  { name: '纸袋', cat: 'recyclable', desc: '纸质购物袋、礼品袋等干净纸张。' },
+  { name: '塑料瓶盖', cat: 'recyclable', desc: '塑料饮料瓶的盖子，可随瓶身一起回收。' },
+  { name: '易拉罐环', cat: 'recyclable', desc: '易拉罐的拉环，随罐体一起回收。' },
+  { name: '旧毛绒玩具', cat: 'recyclable', desc: '废弃的毛绒公仔、布偶等织物类玩具。' },
+  { name: '旧床单', cat: 'recyclable', desc: '废弃的床单、被套、枕套等家用纺织品。' },
+  { name: '旧毛巾', cat: 'recyclable', desc: '废弃的浴巾、毛巾、抹布等棉质织物。' },
+  { name: '废电线', cat: 'recyclable', desc: '废弃的铜芯电线、铝芯电线等金属线材。' },
+  { name: '金属衣架', cat: 'recyclable', desc: '废弃的铁制或钢制衣架、晾衣架。' },
+  { name: '塑料衣架', cat: 'recyclable', desc: '废弃的塑料衣架。' },
+  { name: '塑料购物袋', cat: 'recyclable', desc: '干净的塑料袋、购物袋等塑料薄膜制品。' },
+  { name: '光盘', cat: 'recyclable', desc: '废弃的CD、DVD光盘及光盘盒。' },
+  { name: '旧手机', cat: 'recyclable', desc: '废弃的手机及手机配件，可回收其中的贵金属。' },
+  { name: '充电器', cat: 'recyclable', desc: '废弃的手机充电器、电源适配器等电子配件。' },
+  { name: '废旧家电', cat: 'recyclable', desc: '废弃的小家电如电吹风、电饭煲、台灯等。' },
+  { name: '废铁丝', cat: 'recyclable', desc: '废弃的铁丝、钢丝、金属丝线等。' },
+  { name: '剪刀', cat: 'recyclable', desc: '废弃的金属剪刀、美工刀等工具。' },
+  { name: '旧钥匙', cat: 'recyclable', desc: '废弃的金属钥匙。' },
+
+  // 有害垃圾
+  { name: '废电池', cat: 'hazardous', desc: '废弃的干电池、充电电池、纽扣电池、蓄电池等，含重金属元素。' },
+  { name: '锂电池', cat: 'hazardous', desc: '手机锂电池、充电宝电池等可充电电池。' },
+  { name: '纽扣电池', cat: 'hazardous', desc: '手表、计算器、遥控器中使用的纽扣式电池。' },
+  { name: '废灯管', cat: 'hazardous', desc: '废弃的荧光灯管、节能灯、汞灯等含汞光源。' },
+  { name: '节能灯', cat: 'hazardous', desc: '废弃的节能灯泡，含微量汞。' },
+  { name: '废药品', cat: 'hazardous', desc: '过期药品、变质药品、药品包装（未清洗的药瓶）。' },
+  { name: '过期药', cat: 'hazardous', desc: '过期的片剂、胶囊、口服液等药品。' },
+  { name: '废农药', cat: 'hazardous', desc: '废弃的杀虫剂、除草剂、农药瓶及包装物。' },
+  { name: '废油漆', cat: 'hazardous', desc: '废弃的油漆、涂料、稀释剂及其容器。' },
+  { name: '废溶剂', cat: 'hazardous', desc: '废弃的有机溶剂、松香水、天那水等。' },
+  { name: '废机油', cat: 'hazardous', desc: '废弃的发动机油、齿轮油等矿物油。' },
+  { name: '废胶片', cat: 'hazardous', desc: '废弃的X光胶片、照相胶片、胶卷等。' },
+  { name: '废相纸', cat: 'hazardous', desc: '废弃的相纸、打印照片等含银感光材料。' },
+  { name: '指甲油', cat: 'hazardous', desc: '废弃的指甲油、洗甲水等含化学溶剂的化妆品。' },
+  { name: '废温度计', cat: 'hazardous', desc: '废弃的水银温度计，含重金属汞。' },
+  { name: '废血压计', cat: 'hazardous', desc: '废弃的水银血压计，属于含汞废物。' },
+  { name: '杀虫剂', cat: 'hazardous', desc: '废弃的杀虫气雾剂、蚊香片、蟑螂药等。' },
+  { name: '废化学试剂', cat: 'hazardous', desc: '实验室废弃的化学试剂、酸碱溶液等。' },
+  { name: '废荧光粉', cat: 'hazardous', desc: '废弃的荧光增白剂、荧光粉等。' },
+  { name: '废矿物油', cat: 'hazardous', desc: '废弃的润滑油、液压油等矿物油类。' },
+  { name: '废油墨', cat: 'hazardous', desc: '废弃的印刷油墨、墨盒残留油墨等。' },
+  { name: '水银温度计', cat: 'hazardous', desc: '含汞的温度计，破碎后需小心收集。' },
+  { name: '过期化妆品', cat: 'hazardous', desc: '过期的护肤品、彩妆等含化学成分的化妆品。' },
+  { name: '老鼠药', cat: 'hazardous', desc: '废弃的鼠药、蟑螂药等有毒杀虫剂。' },
+  { name: '废镍镉电池', cat: 'hazardous', desc: '废弃的镍镉充电电池，含重金属镉。' },
+  { name: '废荧光灯', cat: 'hazardous', desc: '废弃的日光灯管、环形灯管等含汞灯具。' },
+  { name: '废电路板', cat: 'hazardous', desc: '废弃的电子线路板，含重金属和有害物质。' },
+
+  // 厨余垃圾
+  { name: '剩菜', cat: 'kitchen', desc: '吃剩的饭菜、汤渣等餐厨剩余物。' },
+  { name: '剩饭', cat: 'kitchen', desc: '吃剩的米饭、面条、馒头等主食残余。' },
+  { name: '果皮', cat: 'kitchen', desc: '苹果皮、梨皮、香蕉皮、橘子皮等水果表皮。' },
+  { name: '苹果核', cat: 'kitchen', desc: '吃剩的苹果核、梨核等水果果核。' },
+  { name: '香蕉皮', cat: 'kitchen', desc: '香蕉的外皮，属于易腐烂的生物质废弃物。' },
+  { name: '橘子皮', cat: 'kitchen', desc: '橘子、橙子、柚子的外皮。' },
+  { name: '西瓜皮', cat: 'kitchen', desc: '西瓜皮、哈密瓜皮等瓜类果皮。' },
+  { name: '茶叶渣', cat: 'kitchen', desc: '泡过的茶叶渣、茶包（除去外包装）。' },
+  { name: '咖啡渣', cat: 'kitchen', desc: '冲泡过的咖啡粉末、咖啡滤渣。' },
+  { name: '残花落叶', cat: 'kitchen', desc: '废弃的鲜花、干花、落叶、杂草等植物残体。' },
+  { name: '菜叶', cat: 'kitchen', desc: '摘剩的青菜叶、白菜叶、菠菜叶等蔬菜残余。' },
+  { name: '菜根', cat: 'kitchen', desc: '摘除的菜根、菜蒂等蔬菜不可食部分。' },
+  { name: '蛋壳', cat: 'kitchen', desc: '鸡蛋壳、鸭蛋壳、鹅蛋壳等禽蛋外壳。' },
+  { name: '骨头', cat: 'kitchen', desc: '鸡骨、鱼骨、猪骨等小型动物骨骼。' },
+  { name: '鱼骨', cat: 'kitchen', desc: '吃鱼剩下的鱼刺、鱼骨等。' },
+  { name: '鸡骨头', cat: 'kitchen', desc: '吃剩的鸡骨、鸭骨、鹅骨等禽类骨骼。' },
+  { name: '虾壳', cat: 'kitchen', desc: '虾头、虾壳等虾类废弃部分。' },
+  { name: '蟹壳', cat: 'kitchen', desc: '螃蟹壳、蟹脚等蟹类外壳。' },
+  { name: '花生壳', cat: 'kitchen', desc: '花生外壳、瓜子壳、核桃壳等坚果外壳。' },
+  { name: '瓜子壳', cat: 'kitchen', desc: '葵花籽壳、南瓜子壳等。' },
+  { name: '核桃壳', cat: 'kitchen', desc: '核桃、山核桃等坚果的硬壳。' },
+  { name: '中药渣', cat: 'kitchen', desc: '熬煮过的中药残渣。' },
+  { name: '食物残渣', cat: 'kitchen', desc: '各类食物残渣、碎屑等易腐有机物。' },
+  { name: '过期食品', cat: 'kitchen', desc: '过期的面包、饼干、糕点、熟食等食品。' },
+  { name: '面包', cat: 'kitchen', desc: '过期或变质的面包、蛋糕、饼干等烘焙食品。' },
+  { name: '面条', cat: 'kitchen', desc: '吃剩的面条、米粉、河粉等面食。' },
+  { name: '米饭', cat: 'kitchen', desc: '吃剩或变质的米饭、粥等谷物制品。' },
+  { name: '玉米芯', cat: 'kitchen', desc: '吃完玉米后的玉米棒芯。' },
+  { name: '水果核', cat: 'kitchen', desc: '桃核、杏核、李子核等水果果核。' },
+  { name: '果核', cat: 'kitchen', desc: '各类水果的果核和种子。' },
+  { name: '果籽', cat: 'kitchen', desc: '西瓜籽、南瓜籽、火龙果籽等水果籽。' },
+  { name: '豆渣', cat: 'kitchen', desc: '制作豆浆后剩下的豆渣。' },
+  { name: '汤渣', cat: 'kitchen', desc: '煲汤后的汤料残渣。' },
+  { name: '花草', cat: 'kitchen', desc: '枯萎的盆栽植物、花园剪下的枝叶。' },
+  { name: '树枝树叶', cat: 'kitchen', desc: '庭院修剪的小树枝、落叶等。' },
+  { name: '甘蔗渣', cat: 'kitchen', desc: '嚼过的甘蔗渣、榨汁后的果渣。' },
+  { name: '果酱', cat: 'kitchen', desc: '过期或变质的果酱、果泥等。' },
+  { name: '调料渣', cat: 'kitchen', desc: '火锅底料残渣、调料包内容物等。' },
+  { name: '茶叶', cat: 'kitchen', desc: '冲泡过的茶叶、茶渣。' },
+
+  // 其他垃圾
+  { name: '卫生纸', cat: 'other', desc: '使用过的卫生纸、纸巾、湿纸巾等，遇水即溶不宜回收。' },
+  { name: '餐巾纸', cat: 'other', desc: '使用过的餐巾纸、厨房用纸、纸手帕等。' },
+  { name: '纸尿裤', cat: 'other', desc: '婴儿纸尿裤、成人纸尿裤、卫生巾等一次性卫生用品。' },
+  { name: '卫生巾', cat: 'other', desc: '废弃的卫生巾、护垫等女性卫生用品。' },
+  { name: '湿纸巾', cat: 'other', desc: '使用过的湿巾、消毒湿巾等。' },
+  { name: '一次性餐具', cat: 'other', desc: '一次性筷子、塑料勺叉、打包餐盒等，沾染油污不宜回收。' },
+  { name: '一次性筷子', cat: 'other', desc: '使用过的一次性竹筷、木筷。' },
+  { name: '快餐盒', cat: 'other', desc: '使用过的外卖塑料餐盒、泡沫餐盒（沾有油污）。' },
+  { name: '脏塑料袋', cat: 'other', desc: '被油污、食物残渣污染的塑料袋，不宜回收。' },
+  { name: '保鲜膜', cat: 'other', desc: '使用过的保鲜膜、保鲜袋等塑料薄膜。' },
+  { name: '食品包装袋', cat: 'other', desc: '被食物污染的零食袋、调味料包装等复合包装。' },
+  { name: '烟蒂', cat: 'other', desc: '香烟过滤嘴、烟灰等烟草废弃物。' },
+  { name: '烟头', cat: 'other', desc: '吸完的香烟烟蒂。' },
+  { name: '尘土', cat: 'other', desc: '扫地收集的灰尘、尘埃、碎屑等。' },
+  { name: '灰尘', cat: 'other', desc: '室内外清扫收集的尘土和杂物。' },
+  { name: '陶瓷碎片', cat: 'other', desc: '破碎的碗碟、花瓶、瓷砖等陶瓷制品。' },
+  { name: '陶瓷碗', cat: 'other', desc: '废弃的陶瓷碗、盘、杯等餐具。' },
+  { name: '瓦片', cat: 'other', desc: '废弃的瓦片、砖块碎块等建筑垃圾。' },
+  { name: '破碗', cat: 'other', desc: '摔碎的陶瓷碗碟、玻璃餐具等。' },
+  { name: '渣土', cat: 'other', desc: '装修产生的渣土、碎石等建筑废弃物。' },
+  { name: '灰烬', cat: 'other', desc: '炭灰、煤灰、香灰等燃烧残余物。' },
+  { name: '煤渣', cat: 'other', desc: '煤炭燃烧后的残渣。' },
+  { name: '头发', cat: 'other', desc: '剪下的头发、掉落的毛发。' },
+  { name: '指甲', cat: 'other', desc: '剪下的手指甲、脚趾甲。' },
+  { name: '创可贴', cat: 'other', desc: '使用过的创可贴、医用胶带等。' },
+  { name: '口罩', cat: 'other', desc: '使用过的一次性口罩、医用口罩等。' },
+  { name: '棉签', cat: 'other', desc: '使用过的棉签、棉球等。' },
+  { name: '橡皮屑', cat: 'other', desc: '擦除铅笔字迹产生的橡皮碎屑。' },
+  { name: '钢笔', cat: 'other', desc: '废弃的钢笔、圆珠笔、水性笔等文具。' },
+  { name: '圆珠笔', cat: 'other', desc: '用完的圆珠笔、签字笔等。' },
+  { name: '铅笔', cat: 'other', desc: '废弃的铅笔、自动铅笔等。' },
+  { name: '胶带', cat: 'other', desc: '使用过的透明胶带、封箱胶带等。' },
+  { name: '便利贴', cat: 'other', desc: '使用过的便利贴、便签纸等（有粘性残留）。' },
+  { name: '尿不湿', cat: 'other', desc: '使用过的婴儿纸尿裤、成人护理垫等。' },
+  { name: '宠物粪便', cat: 'other', desc: '猫砂、宠物排泄物等动物废弃物。' },
+  { name: '猫砂', cat: 'other', desc: '使用过的猫砂、宠物垫料。' },
+  { name: '牙签', cat: 'other', desc: '使用过的牙签、棉线等口腔清洁用品。' },
+  { name: '吸管', cat: 'other', desc: '使用过的塑料吸管、纸吸管等。' },
+  { name: '一次性纸杯', cat: 'other', desc: '使用过的一次性纸杯，有塑料涂层不易回收。' },
+  { name: '膏药', cat: 'other', desc: '使用过的膏药贴、止痛贴等医疗贴剂。' },
+  { name: '墙纸', cat: 'other', desc: '废弃的壁纸、墙纸等装修材料。' },
+  { name: '气球', cat: 'other', desc: '废弃的橡胶气球、乳胶气球等。' },
+  { name: '化妆棉', cat: 'other', desc: '使用过的卸妆棉、化妆棉等。' },
+  { name: '面膜', cat: 'other', desc: '使用过的面膜布、面膜纸等。' },
+  { name: '隐形眼镜', cat: 'other', desc: '废弃的隐形眼镜、护理液包装等。' },
+  { name: '橡皮擦', cat: 'other', desc: '废弃的橡皮擦、修正带等文具。' },
+  { name: '竹筷', cat: 'other', desc: '使用过的一次性竹筷、木筷。' },
+  { name: '泡沫', cat: 'other', desc: '废弃的泡沫塑料、泡沫饭盒（被污染）。' },
+  { name: '编织袋', cat: 'other', desc: '废弃的编织袋、蛇皮袋等。' },
+  { name: '粽叶', cat: 'other', desc: '包裹粽子的粽叶，因质地较硬不易腐烂。' },
+  { name: '玉米皮', cat: 'other', desc: '玉米的外层苞叶，纤维较硬。' },
+  { name: '大棒骨', cat: 'other', desc: '猪大腿骨、牛棒骨等大型动物骨骼，不易粉碎。' },
+  { name: '贝壳', cat: 'other', desc: '蛤蜊壳、扇贝壳、牡蛎壳等海鲜外壳，质地坚硬。' },
+  { name: '椰子壳', cat: 'other', desc: '椰子坚硬的外壳，不易腐烂。' },
+  { name: '榴莲壳', cat: 'other', desc: '榴莲的硬壳，质地坚硬不易处理。' },
+  { name: '核桃壳', cat: 'other', desc: '核桃、山核桃等坚果硬壳。' },
+  { name: '图钉', cat: 'other', desc: '废弃的图钉、回形针、别针等小件金属。' },
+  { name: '牙线', cat: 'other', desc: '使用过的牙线、牙线棒等。' },
+  { name: '粉笔', cat: 'other', desc: '废弃的粉笔、粉笔头。' },
+  { name: '橡皮泥', cat: 'other', desc: '废弃的橡皮泥、超轻土等手工材料。' },
+];
+
+let activeCat = 'all';
+
+function getCat(cat) { return CATEGORIES[cat]; }
+function getItems(cat) { return cat === 'all' ? ITEMS : ITEMS.filter(i => i.cat === cat); }
+
+function renderGrid(cat) {
+  const grid = document.getElementById('itemsGrid');
+  const title = document.getElementById('listTitle');
+  const count = document.getElementById('listCount');
+  const items = getItems(cat);
+  if (!items.length) {
+    grid.innerHTML = '<div class="empty-state"><div class="big-icon">🔍</div><p>该分类暂无数据</p></div>';
+    title.textContent = cat === 'all' ? '全部物品' : CATEGORIES[cat].name;
+    count.textContent = '';
+    return;
+  }
+  title.textContent = cat === 'all' ? '全部物品' : CATEGORIES[cat].name;
+  count.textContent = '共 ' + items.length + ' 项';
+  grid.innerHTML = items.map(item => {
+    const c = getCat(item.cat);
+    return '<div class="item-card" onclick="showResult(\'' + item.name + '\')">' +
+      '<div>' + item.name + '</div>' +
+      '<div class="line" style="background:' + c.color + ';"></div></div>';
+  }).join('');
+}
+
+function setActiveCat(cat) {
+  activeCat = cat;
+  document.querySelectorAll('.cat-btn').forEach(btn => {
+    const isActive = btn.dataset.cat === cat;
+    btn.classList.toggle('active', isActive);
+    if (isActive) {
+      const c = cat === 'all' ? '#607D8B' : CATEGORIES[cat].color;
+      btn.style.borderColor = c;
+    } else {
+      btn.style.borderColor = 'transparent';
+    }
+  });
+  renderGrid(cat);
+  hideResult();
+  hideSuggestions();
+}
+
+document.getElementById('catFilters').addEventListener('click', function(e) {
+  var btn = e.target.closest('.cat-btn');
+  if (btn) setActiveCat(btn.dataset.cat);
+});
+
+function findItem(name) {
+  for (var i = 0; i < ITEMS.length; i++) {
+    if (ITEMS[i].name === name) return ITEMS[i];
+  }
+  return null;
+}
+
+function searchItems(query) {
+  if (!query.trim()) return [];
+  var q = query.trim().toLowerCase();
+  var results = [];
+  for (var i = 0; i < ITEMS.length; i++) {
+    if (ITEMS[i].name.indexOf(q) !== -1 || ITEMS[i].desc.indexOf(q) !== -1) {
+      results.push(ITEMS[i]);
+    }
+  }
+  return results;
+}
+
+function showResult(name) {
+  var item = findItem(name);
+  if (!item) return;
+  var c = getCat(item.cat);
+  document.getElementById('resultIcon').textContent = c.icon;
+  document.getElementById('resultName').textContent = item.name;
+  document.getElementById('resultLabel').textContent = c.name;
+  document.getElementById('resultLabel').style.background = c.color;
+  document.getElementById('resultDesc').textContent = item.desc;
+  document.getElementById('resultWrap').classList.add('show');
+  document.getElementById('resultWrap').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function hideResult() {
+  document.getElementById('resultWrap').classList.remove('show');
+}
+document.getElementById('closeResult').addEventListener('click', hideResult);
+
+function hideSuggestions() {
+  document.getElementById('suggestions').classList.remove('show');
+}
+
+function renderSuggestions(query) {
+  var el = document.getElementById('suggestions');
+  var results = searchItems(query).slice(0, 8);
+  if (!results.length) { el.classList.remove('show'); return; }
+  var html = '';
+  for (var i = 0; i < results.length; i++) {
+    var item = results[i];
+    var c = getCat(item.cat);
+    var idx = item.name.toLowerCase().indexOf(query.toLowerCase());
+    var displayName = item.name;
+    if (idx !== -1) {
+      displayName = item.name.slice(0, idx) + '<strong>' + item.name.slice(idx, idx + query.length) + '</strong>' + item.name.slice(idx + query.length);
+    }
+    html += '<div class="item" onclick="selectSuggestion(\'' + item.name.replace(/'/g, "\\'") + '\')">' +
+      '<span>' + displayName + '</span>' +
+      '<span class="tag" style="background:' + c.color + ';">' + c.name + '</span></div>';
+  }
+  el.innerHTML = html;
+  el.classList.add('show');
+}
+
+function selectSuggestion(name) {
+  document.getElementById('searchInput').value = name;
+  hideSuggestions();
+  showResult(name);
+}
+
+var searchInput = document.getElementById('searchInput');
+searchInput.addEventListener('input', function(e) {
+  var val = e.target.value.trim();
+  if (val) renderSuggestions(val);
+  else hideSuggestions();
+});
+searchInput.addEventListener('focus', function(e) {
+  var val = e.target.value.trim();
+  if (val) renderSuggestions(val);
+});
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.search-wrap')) hideSuggestions();
+});
+searchInput.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') {
+    hideSuggestions();
+    var val = searchInput.value.trim();
+    if (val) {
+      var results = searchItems(val);
+      if (results.length) showResult(results[0].name);
+    }
+  }
+});
+
+document.getElementById('searchBtn').addEventListener('click', function() {
+  hideSuggestions();
+  var val = searchInput.value.trim();
+  if (val) {
+    var results = searchItems(val);
+    if (results.length) showResult(results[0].name);
+  }
+});
+
+
+// ---- Voice Recognition ----
+var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+var recognition = null;
+var isListening = false;
+
+function startListening() {
+  if (!SpeechRecognition) {
+    setVoiceStatus('❌ 当前浏览器不支持语音识别，请使用 Chrome 或 Edge');
+    setTimeout(clearVoiceStatus, 3000);
+    return;
+  }
+  if (isListening) return;
+  recognition = new SpeechRecognition();
+  recognition.lang = 'zh-CN';
+  recognition.continuous = false;
+  recognition.interimResults = false;
+  recognition.maxAlternatives = 1;
+
+  document.getElementById('micBtn').classList.add('listening');
+  document.getElementById('micLabel').textContent = '🎤 正在聆听...';
+  document.getElementById('micLabel').classList.add('active');
+  setVoiceStatus('🎤 请说话，试试说「塑料瓶是什么垃圾」');
+  isListening = true;
+
+  recognition.onresult = function(e) {
+    var text = e.results[0][0].transcript;
+    isListening = false;
+    document.getElementById('micBtn').classList.remove('listening');
+    document.getElementById('micLabel').textContent = '✅ 已识别';
+    document.getElementById('micLabel').classList.remove('active');
+    setVoiceStatus('✅ 识别结果: ' + text);
+    setTimeout(clearVoiceStatus, 2000);
+    handleVoiceQuery(text);
+  };
+
+  recognition.onerror = function(e) {
+    isListening = false;
+    document.getElementById('micBtn').classList.remove('listening');
+    document.getElementById('micLabel').textContent = '点击说话';
+    document.getElementById('micLabel').classList.remove('active');
+    if (e.error === 'no-speech') {
+      setVoiceStatus('❌ 没有检测到语音，请重试');
+    } else if (e.error === 'not-allowed') {
+      setVoiceStatus('❌ 麦克风权限被拒绝，请在浏览器设置中允许');
+    } else {
+      setVoiceStatus('❌ 识别出错: ' + e.error);
+    }
+    setTimeout(clearVoiceStatus, 3000);
+  };
+
+  recognition.onend = function() {
+    isListening = false;
+    document.getElementById('micBtn').classList.remove('listening');
+    document.getElementById('micLabel').textContent = '点击说话';
+    document.getElementById('micLabel').classList.remove('active');
+    clearVoiceStatus();
+  };
+
+  try {
+    recognition.start();
+  } catch(e) {
+    isListening = false;
+    document.getElementById('micBtn').classList.remove('listening');
+    document.getElementById('micLabel').textContent = '点击说话';
+    document.getElementById('micLabel').classList.remove('active');
+    setVoiceStatus('❌ 启动麦克风失败');
+    setTimeout(clearVoiceStatus, 3000);
+  }
+}
+
+function stopListening() {
+  if (recognition && isListening) {
+    recognition.stop();
+  }
+  isListening = false;
+  document.getElementById('micBtn').classList.remove('listening');
+  document.getElementById('micLabel').textContent = '点击说话';
+  document.getElementById('micLabel').classList.remove('active');
+  clearVoiceStatus();
+}
+
+document.getElementById('micBtn').addEventListener('click', function() {
+  if (isListening) {
+    stopListening();
+  } else {
+    startListening();
+  }
+});
+
+function setVoiceStatus(msg) {
+  var el = document.getElementById('voiceStatus');
+  el.textContent = msg;
+  el.classList.add('active');
+}
+
+function clearVoiceStatus() {
+  var el = document.getElementById('voiceStatus');
+  el.textContent = '';
+  el.classList.remove('active');
+}
+
+function handleVoiceQuery(text) {
+  if (!text) return;
+  var clean = parseQuery(text);
+  if (clean) {
+    document.getElementById('searchInput').value = clean;
+    showResult(clean);
+    speakResult(clean);
+  } else {
+    // Try searching the raw text
+    var results = searchItems(text);
+    if (results.length) {
+      document.getElementById('searchInput').value = results[0].name;
+      showResult(results[0].name);
+      speakResult(results[0].name);
+    } else {
+      setVoiceStatus('❌ 未识别到物品名称，请重试');
+      setTimeout(clearVoiceStatus, 2500);
+    }
+  }
+}
+
+function parseQuery(text) {
+  text = text.replace(/[，。？、\s]/g, ' ').trim();
+  // Common patterns: xxx是什么垃圾, xxx属于什么垃圾, xxx应该扔到哪里, etc.
+  var patterns = [
+    /(.+?)是(?:属于|算)?什么垃圾/,
+    /(.+?)属于(?:什么|哪类)垃圾/,
+    /(.+?)应该扔(?:到|在)?(?:哪个|什么)垃圾桶/,
+    /(.+?)怎么(?:分类|扔|处理)/,
+    /(.+?)(?:是|算|属于)\S*垃圾/,
+    /我想问(.+?)(?:的|是)?/,
+    /请问(.+?)(?:的|是|属于)?/,
+    /知道(.+?)(?:的|是|属于)?/,
+  ];
+  for (var i = 0; i < patterns.length; i++) {
+    var m = text.match(patterns[i]);
+    if (m && m[1]) {
+      var name = m[1].trim();
+      var item = findItem(name);
+      if (item) return name;
+    }
+  }
+  // Check if whole text matches an item
+  var item = findItem(text);
+  if (item) return text;
+  // Try partial match
+  for (var i = 0; i < ITEMS.length; i++) {
+    if (text.indexOf(ITEMS[i].name) !== -1) {
+      return ITEMS[i].name;
+    }
+  }
+  return null;
+}
+
+// ---- Text-to-Speech ----
+function speakResult(name) {
+  var item = findItem(name);
+  if (!item) return;
+  var cat = getCat(item.cat);
+  var msg = name + '属于' + cat.name + '。' + item.desc.replace(/。$/, '');
+  if ('speechSynthesis' in window) {
+    window.speechSynthesis.cancel();
+    var utter = new SpeechSynthesisUtterance(msg);
+    utter.lang = 'zh-CN';
+    utter.rate = 0.95;
+    utter.pitch = 1.0;
+    window.speechSynthesis.speak(utter);
+  }
+}
+
+document.getElementById('speakerBtn').addEventListener('click', function() {
+  var name = document.getElementById('resultName').textContent;
+  if (name) speakResult(name);
+});
+
+setActiveCat('all');
+</script>
+</body>
+</html>
